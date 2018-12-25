@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "env": {
+    "INFURA_API_KEY": "@infura-api-key",
+    "AIRTABLE_KEY": "@address-asset-collateral",
+    "ADDRESS_GENERATE_REVENUE": "@address-generate-revenue",
+    "PRIVATE_KEY_GENERATE_REVENUE": "@private-key-generate-revenue",
+  }
+}
