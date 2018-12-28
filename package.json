@@ -1,8 +1,8 @@
 {
-  "name": "MyBit - Revenue Maker for V0.1",
+  "name": "MyBit_Revenue_Maker",
   "version": "1.0.0",
   "description": "",
-  "main": "RevenueMaker.js",
+  "main": "index.js",
   "scripts": {
     "start-dev": "NODE_ENV=development node index.js",
     "now-start": "node index.js"
