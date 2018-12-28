@@ -13,8 +13,8 @@ const InitialVariables = require('./constants/contracts/InitialVariables');
 const Constants = require('./constants');
 const Airtable = require('./airtable');
 
-const ADDRESS = process.env.ADDRESS_GENERATE_REVENUE;
-const PRIVATE_KEY = Buffer.from(process.env.PRIVATE_KEY_GENERATE_REVENUE, 'hex');
+const ADDRESS = process.env.ADDRESS;
+const ADDRESS_PRIVATE_KEY = Buffer.from(process.env.ADDRESS_PRIVATE_KEY, 'hex');
 let airtableAssetsById = {};
 //index 0 = open for funding
 //index 1 = failed
@@ -163,7 +163,7 @@ const receiveIncome = async(assetId, nonce) => {
     }
 
     const tx = new Tx(rawTx)
-    tx.sign(PRIVATE_KEY)
+    tx.sign(ADDRESS_PRIVATE_KEY)
     let serializedTx = "0x" + tx.serialize().toString('hex');
     web3.eth.sendSignedTransaction(serializedTx)
     .on('receipt', receipt => {
@@ -199,7 +199,7 @@ const payoutAsset = async(assetId, nonce) => {
     }
 
     const tx = new Tx(rawTx)
-    tx.sign(PRIVATE_KEY)
+    tx.sign(ADDRESS_PRIVATE_KEY)
     let serializedTx = "0x" + tx.serialize().toString('hex');
     web3.eth.sendSignedTransaction(serializedTx)
     .on('receipt', receipt => {
@@ -250,7 +250,7 @@ const updateEtherPrice = async() => {
       }
 
       const tx = new Tx(rawTx)
-      tx.sign(PRIVATE_KEY)
+      tx.sign(ADDRESS_PRIVATE_KEY)
       let serializedTx = "0x" + tx.serialize().toString('hex');
       web3.eth.sendSignedTransaction(serializedTx)
       .on('receipt', receipt => {
@@ -274,7 +274,6 @@ const initialize = async() => {
     console.log(etherPrice)
     if(!dev){
       updatingEtherPrice = await updateEtherPrice();
-      console.log
     }
   }while (etherPrice == 0);
   console.log("main")
