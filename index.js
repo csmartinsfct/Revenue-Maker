@@ -28,8 +28,9 @@ let password = '';
 let millisecondsToGo = 3600000; //60 minutes
 const oneHourInMilliseconds = 3600000;
 const sevenMinutesInMilliseconds = 420000;
-const minTime = 0.5 * oneHourInMilliseconds;
-const maxTime = 2 * oneHourInMilliseconds;
+const thirtySeconds = 30000;
+const minTime = 0.5 * thirtySeconds;
+const maxTime = 2 * thirtySeconds;
 let oldEthPrice;
 
 var web3 = new Web3();
@@ -42,8 +43,7 @@ const main = () =>{
     millisecondsToGo = Math.floor(Math.random() * maxTime) + minTime;
     console.log("Running script again on: " + dayjs(new Date().getTime() + millisecondsToGo).toString());
     setTimeout(main, millisecondsToGo);
-
-  }catch(err){
+  } catch(err) {
     console.log("Error in main: " + err);
     setTimeout(main, 5000);
   }
@@ -57,14 +57,17 @@ const fetchPriceFromCoinmarketcap = () => {
       );
       const price = response.data.data.quotes.USD.price;
       const priceFormatted = Math.round(price * 100) / 100;
+      logger('fetchPriceFromCoinmarketcap', 'priceFormatted', priceFormatted)
       resolve(priceFormatted);
     } catch (error) {
+      logger('fetchPriceFromCoinmarketcap', 'error', error)
       reject(error);
     }
   });
 }
 
 const fetchAssets = async() => {
+  logger('fetchAssets', 'updatingEtherPrice', updatingEtherPrice)
   if(updatingEtherPrice){
     return;
   }
@@ -101,6 +104,7 @@ const fetchAssets = async() => {
     );
 
     nonce = await web3.eth.getTransactionCount(ADDRESS) - 1;
+    logger('fetchAssets', 'nonce', nonce)
 
     assets = assets.filter((asset, index) => asset.fundingStage === 3 || asset.fundingStage === 4)
     assets.map((asset, index) => {
@@ -127,6 +131,7 @@ const receiveIncome = async(assetId, nonce) => {
     );
 
     const assetRevenueDetails = airtableAssetsById[assetId];
+    logger('receiveIncome', 'assetRevenueDetails', assetRevenueDetails)
 
     if(!assetRevenueDetails){
       return;
@@ -134,25 +139,36 @@ const receiveIncome = async(assetId, nonce) => {
 
     const minAmount = Number(assetRevenueDetails.min);
     const maxAmount = Number(assetRevenueDetails.max);
-    //the ranges are for two hours of work, we need to do the math to average out the income
-    //example: if the script runs 10 mins after it had run then the revenue should be smaller
-    //first run it isn't
-    let revenueInUSD = Math.floor(Math.random() * maxAmount) + minAmount;
-    if(millisecondsToGo > 0){
-      const newMinRevenue = (millisecondsToGo * minAmount) / 7200000;
-      const newMaxRevenue = (millisecondsToGo * maxAmount) / 7200000;
-      const revenueInUSD = Math.floor(Math.random() * newMaxRevenue) + newMinRevenue;
-    }
+    
+    
+    /*
+    * the ranges are for two hours of work, we need to do the math to average out the income
+    * example: if the script runs 10 mins after it had run then the revenue should be smaller
+    * first run it isn't
+    */
+    
+    const newMinRevenue = (millisecondsToGo * minAmount) / 7200000;
+    const newMaxRevenue = (millisecondsToGo * maxAmount) / 7200000;
+    
+    const revenueInUSD = millisecondsToGo > 0 ? 
+      Math.floor(Math.random() * newMaxRevenue) + newMinRevenue :
+      Math.floor(Math.random() * maxAmount) + minAmount;
+    
 
     const etherAmount = revenueInUSD / etherPrice;
 
     const weiAmount = web3.utils.toWei(etherAmount.toFixed(18), 'ether')
 
     console.log(`\n\n>>>>>> Sending ${etherAmount.toFixed(5)} ETH | $${revenueInUSD.toFixed(2)} to ${assetId} >>>>>>\n\n`)
+    
+    logger('receiveIncome', 'etherAmount', etherAmount.toFixed(5))
+    logger('receiveIncome', 'revenueInUSD', revenueInUSD.toFixed(2))
+    logger('receiveIncome', 'assetId', assetId)
+    
 
-    var data = await assetBankContract.methods.receiveIncome(assetId, web3.utils.sha3('note')).encodeABI();
+    const data = await assetBankContract.methods.receiveIncome(assetId, web3.utils.sha3('note')).encodeABI();
 
-    let rawTx = {
+    const rawTx = {
       nonce: web3.utils.toHex(nonce),
       gasPrice: web3.utils.toHex(20000000000),
       gasLimit: web3.utils.toHex(140000),
@@ -164,13 +180,12 @@ const receiveIncome = async(assetId, nonce) => {
 
     const tx = new Tx(rawTx)
     tx.sign(ADDRESS_PRIVATE_KEY)
-    let serializedTx = "0x" + tx.serialize().toString('hex');
+    const serializedTx = "0x" + tx.serialize().toString('hex');
     web3.eth.sendSignedTransaction(serializedTx)
     .on('receipt', receipt => {
-      console.log("SENT SUCCESSFULY >>>>>>\n\n")
+      logger('receiveIncome', 'sendSignedTransaction.on(receipt) => receipt', receipt)
     }).on('error', error => {
-      console.log(error);
-      console.log(`FAILED TO SEND ${assetId}>>>>>>\n\n`)
+      logger('payoutAsset', 'sendSignedTransaction.on(error) => error', error)
     });
   }catch(err){
     updatingAssets-=1
@@ -185,11 +200,10 @@ const payoutAsset = async(assetId, nonce) => {
       FundingHub.ADDRESS
     );
 
-    console.log(`\n\n>>>>>> Calling Payout() on asset ${assetId} >>>>>>\n\n`)
+    logger('payoutAsset', 'assetId', assetId)
+    const data = await fundingHubContract.methods.payout(assetId).encodeABI();
 
-    var data = await fundingHubContract.methods.payout(assetId).encodeABI();
-
-    let rawTx = {
+    const rawTx = {
       nonce: web3.utils.toHex(nonce),
       gasPrice: web3.utils.toHex(20000000000),
       gasLimit: web3.utils.toHex(140000),
@@ -200,12 +214,13 @@ const payoutAsset = async(assetId, nonce) => {
 
     const tx = new Tx(rawTx)
     tx.sign(ADDRESS_PRIVATE_KEY)
-    let serializedTx = "0x" + tx.serialize().toString('hex');
+    const serializedTx = "0x" + tx.serialize().toString('hex');
+    
     web3.eth.sendSignedTransaction(serializedTx)
     .on('receipt', receipt => {
-      console.log(`\n\n>>>>>> Finished calling Payout() >>>>>>\n\n`)
+      logger('payoutAsset', 'sendSignedTransaction.on(receipt) => receipt', receipt)
     }).on('error', error => {
-      console.log(error);
+      logger('payoutAsset', 'sendSignedTransaction.on(error) => error', error)
     });
   } catch (err) {
       console.log(err);
@@ -228,9 +243,9 @@ const updateEtherPrice = async() => {
 
       const newPrice = (etherPrice * 1.05).toFixed(0);
       if(oldEthPrice && oldEthPrice.toFixed(0) === newPrice){
-        console.log(`\n\n>>>>>> Price is the same, skipping >>>>>>\n\n`)
-        console.log(oldEthPrice)
-        console.log(newPrice)
+        console.log(`\n\n>>>>>> Price is the same, skipping and resolving to false >>>>>>\n\n`)
+        logger('updateEtherPrice', 'oldEthPrice', oldEthPrice)
+        logger('updateEtherPrice', 'newPrice', newPrice)
         resolve(false);
         return;
       }
@@ -271,12 +286,11 @@ const initialize = async() => {
   airtableAssetsById = await Airtable.getAssetsFromAirtable();
   do {
     etherPrice = await fetchPriceFromCoinmarketcap();
-    console.log(etherPrice)
+    logger('initialize', 'etherPrice', etherPrice)
     if(!dev){
       updatingEtherPrice = await updateEtherPrice();
     }
-  }while (etherPrice == 0);
-  console.log("main")
+  } while (etherPrice == 0);
   main();
 }
 
@@ -289,6 +303,8 @@ setInterval(async() => {
 if(!dev){
   setInterval(async() => {
     updatingEtherPrice = await updateEtherPrice();
-  }, sevenMinutesInMilliseconds);
+  }, thirtySeconds);
 }
 
+
+const logger = (method, variable, data) => console.log(`[ ${method} ] - ${variable}`, data)
