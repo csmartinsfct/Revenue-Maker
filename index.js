@@ -1,6 +1,8 @@
 require('dotenv').config();
+
+const mutex = require('./mutex.js')
+
 const dev = process.env.NODE_ENV === 'development';
-const debug = () => dev ? console.log(message) : {};
 var Web3 = require('web3');
 var axios = require('axios');
 var dayjs = require('dayjs');
@@ -67,10 +69,9 @@ const fetchPriceFromCoinmarketcap = () => {
 }
 
 const fetchAssets = async() => {
+  await mutex.lock('fetchAssets');
   logger('fetchAssets', 'updatingEtherPrice', updatingEtherPrice)
-  if(updatingEtherPrice){
-    return;
-  }
+  
   try {
     // pull asssets from newest contract
     let apiContract = new web3.eth.Contract(API.ABI, API.ADDRESS);
@@ -118,7 +119,11 @@ const fetchAssets = async() => {
           receiveIncome(assetID, nonce + index + 1);
         }
     });
+    
+    mutex.release('fetchAssets');
+    
   } catch (error) {
+    mutex.release('fetchAssets');
     console.log(error)
   }
 }
@@ -229,33 +234,29 @@ const payoutAsset = async(assetId, nonce) => {
 }
 
 const updateEtherPrice = async() => {
-  return new Promise(async (resolve, reject) => {
+  await mutex.lock('updateEtherPrice');
+  
     try{
-      if(updatingAssets !== 1){
-        resolve(false);
-        return;
-      }
-      updatingEtherPrice = true;
+      
       const initialVariablesContract = new web3.eth.Contract(
           InitialVariables.ABI,
           InitialVariables.ADDRESS
         );
 
       const newPrice = (etherPrice * 1.05).toFixed(0);
-      if(oldEthPrice && oldEthPrice.toFixed(0) === newPrice){
+      
+      if (oldEthPrice && oldEthPrice.toFixed(0) === newPrice) {
         console.log(`\n\n>>>>>> Price is the same, skipping and resolving to false >>>>>>\n\n`)
         logger('updateEtherPrice', 'oldEthPrice', oldEthPrice)
         logger('updateEtherPrice', 'newPrice', newPrice)
-        resolve(false);
         return;
       }
       console.log(`\n\n>>>>>> Setting Ether price to ${newPrice} >>>>>>\n\n`)
 
-      var data = await initialVariablesContract.methods.setDailyPrices(newPrice, 1).encodeABI();
-
+      const data = await initialVariablesContract.methods.setDailyPrices(newPrice, 1).encodeABI();
       const nonce = await web3.eth.getTransactionCount(ADDRESS);
 
-      let rawTx = {
+      const rawTx = {
         nonce: web3.utils.toHex(nonce),
         gasPrice: web3.utils.toHex(4000000000),
         gasLimit: web3.utils.toHex(140000),
@@ -266,24 +267,28 @@ const updateEtherPrice = async() => {
 
       const tx = new Tx(rawTx)
       tx.sign(ADDRESS_PRIVATE_KEY)
-      let serializedTx = "0x" + tx.serialize().toString('hex');
+      const serializedTx = "0x" + tx.serialize().toString('hex');
+      
       web3.eth.sendSignedTransaction(serializedTx)
       .on('receipt', receipt => {
         oldEthPrice = etherPrice;
+        mutex.release('updateEtherPrice');
         console.log(`\n\n>>>>>> Set Ether price >>>>>>\n\n`)
       }).on('error', error => {
         console.log(error);
         console.log(`\n\n>>>>>> Failed to set Ether price >>>>>>\n\n`)
+        mutex.release('updateEtherPrice');
       });
-    }catch(err){
-      console.log(err);
+      
+    } catch(err) {
+      logger('updateEtherPrice', 'err', err)
+      mutex.release('updateEtherPrice');
     }
-    resolve(false)
-  })
 }
 
 const initialize = async() => {
   airtableAssetsById = await Airtable.getAssetsFromAirtable();
+  logger('initialize', 'airtableAssetsById', airtableAssetsById)
   do {
     etherPrice = await fetchPriceFromCoinmarketcap();
     logger('initialize', 'etherPrice', etherPrice)
