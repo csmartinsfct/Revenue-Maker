@@ -21,7 +21,7 @@ let airtableAssetsById = {};
 //index 3 = success but needs confirmation, payout()
 //index 4 = live
 let assetStateCounter = [0, 0, 0, 0];
-let updatingEtherPrice = true;
+let updatingEtherPrice = false;
 var updatingAssets = 1;
 let address = '';
 let password = '';
@@ -105,14 +105,14 @@ const fetchAssets = async() => {
     assets = assets.filter((asset, index) => asset.fundingStage === 3 || asset.fundingStage === 4)
     assets.map((asset, index) => {
       const assetID = asset.assetID;
-        if(asset.fundingStage === 3){
-          updatingAssets+=1;
-          payoutAsset(assetID, nonce + index + 1);
-        }
-        else if(asset.fundingStage === 4){
-          updatingAssets+=1;
-          receiveIncome(assetID, nonce + index + 1);
-        }
+      if(asset.fundingStage === 3){
+        updatingAssets+=1;
+        payoutAsset(assetID, nonce + index + 1);
+      }
+      else if(asset.fundingStage === 4){
+        updatingAssets+=1;
+        receiveIncome(assetID, nonce + index + 1);
+      }
     });
   } catch (error) {
     console.log(error)
@@ -148,7 +148,7 @@ const receiveIncome = async(assetId, nonce) => {
 
     const weiAmount = web3.utils.toWei(etherAmount.toFixed(18), 'ether')
 
-    console.log(`\n\n>>>>>> Sending ${etherAmount.toFixed(5)} ETH | $${revenueInUSD.toFixed(2)} to ${assetId} >>>>>>\n\n`)
+    console.log(`\n\n>>>>>> ${new Date().toLocaleString()}  Sending ${etherAmount.toFixed(5)} ETH | $${revenueInUSD.toFixed(2)} to ${assetId} >>>>>>\n\n`)
 
     var data = await assetBankContract.methods.receiveIncome(assetId, web3.utils.sha3('note')).encodeABI();
 
@@ -167,10 +167,10 @@ const receiveIncome = async(assetId, nonce) => {
     let serializedTx = "0x" + tx.serialize().toString('hex');
     web3.eth.sendSignedTransaction(serializedTx)
     .on('receipt', receipt => {
-      console.log("SENT SUCCESSFULY >>>>>>\n\n")
+      console.log(`${new Date().toLocaleString()} SENT SUCCESSFULY >>>>>>\n\n`)
     }).on('error', error => {
       console.log(error);
-      console.log(`FAILED TO SEND ${assetId}>>>>>>\n\n`)
+      console.log(`${new Date().toLocaleString()} FAILED TO SEND ${assetId}>>>>>>\n\n`)
     });
   }catch(err){
     updatingAssets-=1
@@ -202,8 +202,11 @@ const payoutAsset = async(assetId, nonce) => {
     tx.sign(ADDRESS_PRIVATE_KEY)
     let serializedTx = "0x" + tx.serialize().toString('hex');
     web3.eth.sendSignedTransaction(serializedTx)
+    .on('transationhash', (hash) => {
+      console.log(hash)
+    })
     .on('receipt', receipt => {
-      console.log(`\n\n>>>>>> Finished calling Payout() >>>>>>\n\n`)
+      console.log(`\n\n>>>>>> ${new Date().toLocaleString()} Finished calling Payout() >>>>>>\n\n`)
     }).on('error', error => {
       console.log(error);
     });
@@ -228,13 +231,13 @@ const updateEtherPrice = async() => {
 
       const newPrice = (etherPrice * 1.05).toFixed(0);
       if(oldEthPrice && oldEthPrice.toFixed(0) === newPrice){
-        console.log(`\n\n>>>>>> Price is the same, skipping >>>>>>\n\n`)
+        console.log(`\n\n>>>>>> ${new Date().toLocaleString()}  Price is the same, skipping >>>>>>\n\n`)
         console.log(oldEthPrice)
         console.log(newPrice)
         resolve(false);
         return;
       }
-      console.log(`\n\n>>>>>> Setting Ether price to ${newPrice} >>>>>>\n\n`)
+      console.log(`\n\n>>>>>> ${new Date().toLocaleString()}  Setting Ether price to ${newPrice} >>>>>>\n\n`)
 
       var data = await initialVariablesContract.methods.setDailyPrices(newPrice, 1).encodeABI();
 
@@ -255,10 +258,10 @@ const updateEtherPrice = async() => {
       web3.eth.sendSignedTransaction(serializedTx)
       .on('receipt', receipt => {
         oldEthPrice = etherPrice;
-        console.log(`\n\n>>>>>> Set Ether price >>>>>>\n\n`)
+        console.log(`\n\n>>>>>> ${new Date().toLocaleString()}  Set Ether price >>>>>>\n\n`)
       }).on('error', error => {
         console.log(error);
-        console.log(`\n\n>>>>>> Failed to set Ether price >>>>>>\n\n`)
+        console.log(`\n\n>>>>>> ${new Date().toLocaleString()}  Failed to set Ether price >>>>>>\n\n`)
       });
     }catch(err){
       console.log(err);
