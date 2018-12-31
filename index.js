@@ -8,7 +8,7 @@ const Tx = require('ethereumjs-tx');
 const API = require('./constants/contracts/API');
 const AssetCreation = require('./constants/contracts/AssetCreation');
 const FundingHub = require('./constants/contracts/FundingHub');
-const AssetBank = require('./constants/contracts/AssetBank');
+const Asset = require('./constants/contracts/Asset');
 const InitialVariables = require('./constants/contracts/InitialVariables');
 const Constants = require('./constants');
 const Airtable = require('./airtable');
@@ -121,9 +121,9 @@ const fetchAssets = async() => {
 
 const receiveIncome = async(assetId, nonce) => {
   try{
-    const assetBankContract = new web3.eth.Contract(
-      AssetBank.ABI,
-      AssetBank.ADDRESS
+    const AssetContract = new web3.eth.Contract(
+      Asset.ABI,
+      Asset.ADDRESS
     );
 
     const assetRevenueDetails = airtableAssetsById[assetId];
@@ -150,14 +150,14 @@ const receiveIncome = async(assetId, nonce) => {
 
     console.log(`\n\n>>>>>> ${new Date().toLocaleString()}  Sending ${etherAmount.toFixed(5)} ETH | $${revenueInUSD.toFixed(2)} to ${assetId} >>>>>>\n\n`)
 
-    var data = await assetBankContract.methods.receiveIncome(assetId, web3.utils.sha3('note')).encodeABI();
+    var data = await AssetContract.methods.receiveIncome(assetId, web3.utils.sha3('note')).encodeABI();
 
     let rawTx = {
       nonce: web3.utils.toHex(nonce),
       gasPrice: web3.utils.toHex(20000000000),
       gasLimit: web3.utils.toHex(140000),
       from: web3.utils.toHex(ADDRESS),
-      to: AssetBank.ADDRESS,
+      to: Asset.ADDRESS,
       data: data,
       value: web3.utils.toHex(weiAmount),
     }
